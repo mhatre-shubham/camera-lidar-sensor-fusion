@@ -7,10 +7,19 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(pcl_conversions REQUIRED)
+find_package(PCL REQUIRED)
 
-# uncomment the following section in order to fill in
-# further dependencies manually.
-# find_package(<dependency> REQUIRED)
+include_directories(
+  include
+  ${PCL_INCLUDE_DIRS}
+)
+
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
+
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -24,6 +33,12 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+# 1. lidar_preprocessing_node
+add_executable(lidar_preprocessing src/lidar_preprocessing_node.cpp)
+ament_target_dependencies(lidar_preprocessing rclcpp sensor_msgs pcl_conversions)
+target_link_libraries(lidar_preprocessing ${PCL_LIBRARIES})
+
+# Python
 install(PROGRAMS
   src/kitti_lidar_publishing.py
   DESTINATION lib/${PROJECT_NAME}

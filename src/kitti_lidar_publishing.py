@@ -24,7 +24,7 @@ class KittiLidarPublisher(Node):
         self.index = 0
 
         # Publisher
-        self.publisher = self.create_publisher(PointCloud2, "/velodyne_points", 10)
+        self.publisher = self.create_publisher(PointCloud2, "/kitti/point_cloud", 10)
 
         # Timer (10 Hz like KITTI LiDAR)
         self.timer = self.create_timer(0.1, self.publish_pointcloud)

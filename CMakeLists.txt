@@ -34,9 +34,13 @@ if(BUILD_TESTING)
 endif()
 
 # 1. lidar_preprocessing_node
-add_executable(lidar_preprocessing src/lidar_preprocessing_node.cpp)
-ament_target_dependencies(lidar_preprocessing rclcpp sensor_msgs pcl_conversions)
-target_link_libraries(lidar_preprocessing ${PCL_LIBRARIES})
+add_executable(lidar_preprocessing_node src/lidar_preprocessing_node.cpp)
+ament_target_dependencies(lidar_preprocessing_node rclcpp sensor_msgs pcl_conversions)
+target_link_libraries(lidar_preprocessing_node ${PCL_LIBRARIES})
+
+install(TARGETS lidar_preprocessing_node
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 # Python
 install(PROGRAMS

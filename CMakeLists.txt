@@ -11,6 +11,9 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(PCL REQUIRED)
+find_package(rclpy REQUIRED)
+find_package(visualization_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 
 include_directories(
   include
@@ -38,7 +41,20 @@ add_executable(lidar_preprocessing_node src/lidar_preprocessing_node.cpp)
 ament_target_dependencies(lidar_preprocessing_node rclcpp sensor_msgs pcl_conversions)
 target_link_libraries(lidar_preprocessing_node ${PCL_LIBRARIES})
 
-install(TARGETS lidar_preprocessing_node
+# 2. lidar_cluster_detector_node
+add_executable(lidar_cluster_detector_node src/lidar_cluster_detector_node.cpp)
+ament_target_dependencies(lidar_cluster_detector_node
+  rclcpp
+  sensor_msgs
+  visualization_msgs
+  pcl_conversions
+)
+target_link_libraries(lidar_cluster_detector_node ${PCL_LIBRARIES})
+
+
+install(TARGETS 
+  lidar_preprocessing_node 
+  lidar_cluster_detector_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

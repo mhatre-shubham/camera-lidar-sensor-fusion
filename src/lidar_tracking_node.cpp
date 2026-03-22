@@ -225,17 +225,65 @@ private:
         tracks_.erase(std::remove_if(tracks_.begin(), tracks_.end(),
             [this](const Track& t) { return t.time_since_update > max_age_; }), tracks_.end());
 
+        publish_markers(current_frame, stamp);
+    }
+    
+    void publish_markers(const std::string& frame_id, const builtin_interfaces::msg::Time& stamp){
+        
+        visualization_msgs::msg::MarkerArray marker_array;
+        visualization_msgs::msg::MarkerArray delete_all;
+        delete_all.action = visualization_msgs::msg::Marker::DELETEALL;
+        marker_array.markers.push_back(delete_all);
+
+        for (const auto& track : tracks_){
+            if (track.hits < 3) continue;
+
+            double x = track.x(0), y = track.x(1), y = track.x(2);
+
+            // Bounding Box
+            visualization_msgs::msg::Marker box_marker;
+            box_marker.header.frame_id = frame_id;
+            box_marker.header.stamp = stamp;
+            box_marker.ns = "tracked_boxes";
+            box_marker.id = track.track_id * 2;
+            box_marker.type = visualization_msgs::msg::Marker::CUBE;
+            box_marker.action = visualization_msgs::msg::Marker::ADD;
+            box_marker.pose.position.x = x; box_marker.pose.position.y = y; box_marker.pose.position.z = z;
+            box_marker.scale.x = track.size[0]; box_marker.scale.y = track.size[1]; box_marker.scale.z = track.size[2];
+            box_marker.color.r = 0.0; box_marker.color.g = 1.0; box_marker.color.b = 0.0; box_marker.color.a = 0.5;
+            marker_array.markers.push_back(box_marker);
+
+            // Text
+            visualization_msgs::msg::Markrer text_marker;
+            text_marker.header.header = box_marker.header;
+            text_marker.ns = "tracked_text";
+            text_marker.id = (track.track_id * 2) + 1;
+            text_marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
+            text_marker.pose.position.x = x; text_marker.pose.position.y = y;
+            text_marker.pose.position.z = z + (track.size[2] / 2.0) + 0.5;
+            text_marker.scale.z = 0.6;
+            text_marker.color.r = 1.0; text_marker.color.g = 1.0; text_marker.color.b = 1.0; text_marker.color.a = 1.0;
+
+            char text_buffer[50];
+            snprintf(text_buffer, sizeof(text_buffer), "ID: %d", track.track_id);
+            text_marker.text = text_buffer;
+
+            marker_array.marker.push_back(text_marker);
+        }
+
+        tracked_pub_->publish(marker_array);
     }
 
+    rclcpp::Subscription<visualization_msgs::msg::MarkerArray>::SharedPtr subscription_;
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr tracked_pub_;
+}:
 
 
-
-
-
-
-
-
-
-
-
+int main(int argc, char * argv[]) {
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<ObjectTrackingNode>());
+    rclcpp::shutdown();
+    return 0;
 }
+
+

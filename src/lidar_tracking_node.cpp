@@ -96,7 +96,7 @@ public:
 private:
     std::vector<Track> tracks_;
     int next_track_id_;
-    double last_timestep_;
+    double last_timestamp_;
 
     // Tuned Parameters
     int max_age_;
@@ -133,12 +133,12 @@ private:
 
         // Calcualte dynamic dt
         double dt = 0.1;
-        if (last_timestep_ > 0.0){
-            dt = current_time_float - last_timestep_;
+        if (last_timestamp_ > 0.0){
+            dt = current_time_float - last_timestamp_;
             if (dt <= 0.0 || dt > 2.0) 
                 dt = 0.1; // Fallback for loops/pauses
         }
-        last_timestep_ = current_time_float;
+        last_timestamp_ = current_time_float;
         
         // Predict
         std::vector<Eigen::Vector3d> predictions;
@@ -193,13 +193,13 @@ private:
                 }
             }
 
-            for (size_t t = 0; t < tracks_.size(); t++){
+            for (size_t t = 0; t < tracks_.size(); ++t){
                 if (!trk_assigned[t]){
                     unmatched_tracks.push_back(t);
                 }
             }
 
-            for (size_t d = 0; d < detections.size(); d++){
+            for (size_t d = 0; d < detections.size(); ++d){
                 if (!det_assigned[d]){
                     unmatched_detections.push_back(d);
                 }
@@ -207,8 +207,8 @@ private:
         }
 
         else{
-            for(size_t d = 0; detections.size(); d++) unmatched_detections.push_back(d);
-            for(size_t t = 0; tracks_.size(); t++) unmatched_tracks.push_back(t);
+            for(size_t d = 0; d < detections.size(); ++d) unmatched_detections.push_back(d);
+            for(size_t t = 0; t < tracks_.size(); ++t) unmatched_tracks.push_back(t);
         }
 
         // Update matched tracks
@@ -228,17 +228,18 @@ private:
         publish_markers(current_frame, stamp);
     }
     
-    void publish_markers(const std::string& frame_id, const builtin_interfaces::msg::Time& stamp){
+    void publish_markers(const std::string& frame_id, const builtin_interfaces::msg::Time& stamp) {
         
         visualization_msgs::msg::MarkerArray marker_array;
-        visualization_msgs::msg::MarkerArray delete_all;
+
+        visualization_msgs::msg::Marker delete_all;
         delete_all.action = visualization_msgs::msg::Marker::DELETEALL;
         marker_array.markers.push_back(delete_all);
 
-        for (const auto& track : tracks_){
+        for (const auto& track : tracks_) {
             if (track.hits < 3) continue;
 
-            double x = track.x(0), y = track.x(1), y = track.x(2);
+            double x = track.x(0), y = track.x(1), z = track.x(2);
 
             // Bounding Box
             visualization_msgs::msg::Marker box_marker;
@@ -254,21 +255,21 @@ private:
             marker_array.markers.push_back(box_marker);
 
             // Text
-            visualization_msgs::msg::Markrer text_marker;
-            text_marker.header.header = box_marker.header;
+            visualization_msgs::msg::Marker text_marker;
+            text_marker.header = box_marker.header;
             text_marker.ns = "tracked_text";
             text_marker.id = (track.track_id * 2) + 1;
             text_marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
-            text_marker.pose.position.x = x; text_marker.pose.position.y = y;
+            text_marker.pose.position.x = x; text_marker.pose.position.y = y; 
             text_marker.pose.position.z = z + (track.size[2] / 2.0) + 0.5;
             text_marker.scale.z = 0.6;
             text_marker.color.r = 1.0; text_marker.color.g = 1.0; text_marker.color.b = 1.0; text_marker.color.a = 1.0;
-
+            
             char text_buffer[50];
             snprintf(text_buffer, sizeof(text_buffer), "ID: %d", track.track_id);
             text_marker.text = text_buffer;
-
-            marker_array.marker.push_back(text_marker);
+            
+            marker_array.markers.push_back(text_marker);
         }
 
         tracked_pub_->publish(marker_array);
@@ -276,7 +277,7 @@ private:
 
     rclcpp::Subscription<visualization_msgs::msg::MarkerArray>::SharedPtr subscription_;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr tracked_pub_;
-}:
+};
 
 
 int main(int argc, char * argv[]) {
@@ -285,5 +286,3 @@ int main(int argc, char * argv[]) {
     rclcpp::shutdown();
     return 0;
 }
-
-

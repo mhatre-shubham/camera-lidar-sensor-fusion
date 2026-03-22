@@ -14,6 +14,7 @@ find_package(PCL REQUIRED)
 find_package(rclpy REQUIRED)
 find_package(visualization_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 include_directories(
   include
@@ -51,10 +52,18 @@ ament_target_dependencies(lidar_cluster_detector_node
 )
 target_link_libraries(lidar_cluster_detector_node ${PCL_LIBRARIES})
 
+# 3. lidar_tracking_node
+add_executable(lidar_tracking_node src/lidar_tracking_node.cpp)
+ament_target_dependencies(lidar_tracking_node
+  rclcpp
+  visualization_msgs
+)
+target_link_libraries(lidar_tracking_node Eigen3::Eigen)
 
 install(TARGETS 
   lidar_preprocessing_node 
   lidar_cluster_detector_node
+  lidar_tracking_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

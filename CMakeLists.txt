@@ -16,6 +16,10 @@ find_package(visualization_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
 
+find_package(vision_msgs REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(OpenCV REQUIRED)
+
 include_directories(
   include
   ${PCL_INCLUDE_DIRS}
@@ -70,6 +74,8 @@ install(TARGETS
 # Python
 install(PROGRAMS
   src/kitti_lidar_publishing.py
+  src/camera_object_detection_node.py
+  src/kitti_camera_publishing.py
   DESTINATION lib/${PROJECT_NAME}
 )
 ament_package()

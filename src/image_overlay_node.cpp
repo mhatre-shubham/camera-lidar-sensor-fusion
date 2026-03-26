@@ -24,7 +24,7 @@ public:
         yolo_sub_ = this->create_subscription<vision_msgs::msg::Detection2DArray>(
             "/camera/object_detections", 
             10, 
-            std::bind(&ImageOverlayNode::yolo_callback, this, std::placeholders::_1;)
+            std::bind(&ImageOverlayNode::yolo_callback, this, std::placeholders::_1)
         );
         
         mot_sub_ = this->create_subscription<visualization_msgs::msg::MarkerArray>(
@@ -212,11 +212,58 @@ private:
             }
         }
 
+        // Visualization
+        for (size_t i = 0; i < valid_tracks.size(); ++i) {
+            cv::Rect2f draw_box;
+            std::string best_label;
+            cv::Scalar color;
+            int thickness;
 
+            if (matched_mot_indices.count(i)) {
+                // Match found
+                int yolo_idx = matched_mot_indices[i];
+                draw_box = yolo_boxes[yolo_idx];
+                best_label = yolo_labels[yolo_idx];
+                color = cv::Scalar(255, 255, 0);
+                thickness = 2;
+            } else {
+                // No match
+                if (!show_unmatched_tracks_) continue;
+                draw_box = valid_mot_boxes[i];
+                best_label = "Object";
+                color = cv::Scalar(150, 150, 150);
+                thickness = 1;
+            }
 
+            cv::rectangle(img, draw_box, color, thickness);
+            char label_text[100];
+            std::transform(best_label.begin(), best_label.end(), best_label.begin(), ::toupper);
+            snprintf(label_text, sizeof(label_text), "%s | ID:%d | %.1fm",
+                    best_label.c_str(), 
+                    valid_tracks[i].id / 2, 
+                    distances[i]);
 
+            int baseline = 0;
+            cv::Size text_size = cv::getTextSize(label_text, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, &baseline);
 
+            cv::rectangle(img, 
+                cv::Point(draw_box.x, draw_box.y - text_size.height - 5),
+                cv::Point(draw_box.x + text_size.width, draw_box.y),
+                color, cv::FILLED);
 
+            cv::putText(img, label_text, cv::Point(draw_box.x, draw_box.y - 5), 
+                        cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0), 2);
+        }
+
+        image_pub_->publish(*cv_bridge::CvImage(msg->header, "bgr8", img). toImageMsg());
 
     }
+};
+
+int main(int argc, char * argv[])
+{
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<ImageOverlayNode>());
+    rclcpp::shutdown();
+    return 0;
 }

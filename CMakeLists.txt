@@ -64,10 +64,33 @@ ament_target_dependencies(lidar_tracking_node
 )
 target_link_libraries(lidar_tracking_node Eigen3::Eigen)
 
+# 4. image_overlay_node
+add_executable(image_overlay_node src/image_overlay_node.cpp)
+ament_target_dependencies(image_overlay_node
+  rclcpp
+  sensor_msgs
+  vision_msgs
+  visualization_msgs
+  cv_bridge
+)
+target_link_libraries(image_overlay_node ${OpenCV_LIBS})
+
+# 5. lidar_camera_Projection
+add_executable(lidar_camera_projection_node src/lidar_camera_projection_node.cpp)
+ament_target_dependencies(lidar_camera_projection_node
+  rclcpp
+  sensor_msgs
+  cv_bridge
+  message_filters
+)
+target_link_libraries(lidar_camera_projection_node ${OpenCV_LIBS})
+
 install(TARGETS 
   lidar_preprocessing_node 
   lidar_cluster_detector_node
   lidar_tracking_node
+  image_overlay_node
+  lidar_camera_projection_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

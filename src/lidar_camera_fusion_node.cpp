@@ -22,12 +22,12 @@ public:
         setup_calibration_matrices();
 
         yolo_sub_ = this->create_subscription<vision_msgs::msg::Detection2DArray>(
-            "/camera/object_detection", 10, std::bind(&LidarCameraFusionNode::yolo_callback, this, std::placeholders::_1));
+            "/camera/object_detections", 10, std::bind(&LidarCameraFusionNode::yolo_callback, this, std::placeholders::_1));
 
         mot_sub_ = this->create_subscription<visualization_msgs::msg::MarkerArray>(
             "/lidar/tracked_objects", 10, std::bind(&LidarCameraFusionNode::mot_callback, this, std::placeholders::_1));
             
-        pub_identified_ = this->create_publisher<visualization_msgs::msg::MarkerArray(
+        pub_identified_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
             "/fusion/identified_objects", 10);
 
         pub_unknown_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
@@ -89,9 +89,9 @@ private:
         std_msgs::msg::ColorRGBA color;
         color.a = 0.7;
 
-        if (label == "car" || label == "truck" || label = "bus" || label = "bicycle" || label = "motorcycle") {
-            color.r = 1.0, color.g = 0.5, color.b = 0.0; // Orange
-        } else if (label = "Person") {
+        if (label == "car" || label == "truck" || label == "bus" || label == "bicycle" || label == "motorcycle") {
+            color.r = 1.0; color.g = 0.5; color.b = 0.0; // Orange
+        } else if (label == "person") {
             color.r = 1.0; color.g = 0.0; color.b = 0.0; // Red
         } else if (label == "traffic light" || label == "stop sign") {
             color.r = 1.0; color.g = 1.0; color.b = 0.0; // Yellow
@@ -161,19 +161,166 @@ private:
             }
         }
 
+        // Deletion Logic (Cleanup stale memory). Erase memory when track is eliminated
+        std::vector<int> dead_ids;
+        std::set_difference(active_ids_.begin(), active_ids_.end(),
+                            current_live_ids.begin(), current_live_ids.end(),
+                            std::inserter(dead_ids, dead_ids.begin()));
 
+        for (int dead_id : dead_ids) {
+            visualization_msgs::msg::Marker cube_delete;
+            cube_delete.header = ref_header;
+            cube_delete.ns = "semantic_cubes";
+            cube_delete.id = dead_id;
+            cube_delete.action = visualization_msgs::msg::Marker::DELETE;
 
+            visualization_msgs::msg::Marker text_delete;
+            text_delete.header = ref_header;
+            text_delete.ns = "semantic_labels";
+            text_delete.id = dead_id + 10000; // To avoid conflicts with cube IDs
+            text_delete.action = visualization_msgs::msg::Marker::DELETE;
 
+            identified_array.markers.push_back(cube_delete);
+            identified_array.markers.push_back(text_delete);
+            
+            unknown_array.markers.push_back(cube_delete);
+            unknown_array.markers.push_back(text_delete);
 
+            label_memory_.erase(dead_id);
+        }
 
+        active_ids_ = current_live_ids;
 
+        // Greedy matching mot idx -> yolo idx
+        std::map<int, int> matched_live_track_indices; 
+        struct Match {
+            int mot_idx;
+            int yolo_idx;
+            double iou;
+        };
+        std::vector<Match> potential_matches;
+
+        // Loop through all the mot boxes and yolo boxes and find potential matches
+        for (size_t i = 0; i < valid_mot_boxes.size(); ++i) {
+            for (size_t j = 0; j < yolo_boxes.size(); ++j) {
+                double iou = calculate_iou(valid_mot_boxes[i], yolo_boxes[j]);
+                if (iou > overlap_threshold_) {
+                    potential_matches.push_back({(int) i, (int) j, iou});
+                }
+            }
+        }
+
+        // sort potential matches by highest IOU
+        std::sort(potential_matches.begin(), potential_matches.end(),
+            [](const Match& a, const Match& b) { return a.iou > b.iou; });
+
+        std::vector<bool> yolo_used(yolo_boxes.size(), false); // Intialize vector to check yolo box is assigned
+
+        for (const auto& match : potential_matches) {
+            int actual_track_idx = valid_mot_indices[match.mot_idx];
+            // If actual_track_idx is not fond in matched_live_track_indices, the track has not assigned to yolo box yet
+            if (matched_live_track_indices.find(actual_track_idx) == matched_live_track_indices.end() && !yolo_used[match.yolo_idx]) {
+                matched_live_track_indices[actual_track_idx] = match.yolo_idx;
+                yolo_used[match.yolo_idx] = true;
+            }
+        }
+        
+        // Generate Fused Markers using label memory
+        for (size_t i = 0; i < live_tracks.size(); ++i) {
+            auto& track = live_tracks[i];
+            int real_id = track.id / 2;
+            
+            if (matched_live_track_indices.count(i)) {
+                label_memory_[real_id] = yolo_labels[matched_live_track_indices[i]];
+            }
+
+            std::string final_label;
+            if (label_memory_.count(real_id)) {
+                final_label = label_memory_[real_id];
+            } else {
+                final_label = "Unknown";
+            }
+
+            // Generate ADD Markers
+            visualization_msgs::msg::Marker cube = track;
+            cube.ns = "semantic_cubes";
+            cube.id = real_id;
+            cube.color = get_semantic_color(final_label);
+
+            visualization_msgs::msg::Marker text;
+            text.header = track.header;
+            text.ns = "semantic_labels";
+            text.id = real_id + 10000;
+            text.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
+            text.action = visualization_msgs::msg::Marker::ADD;
+
+            double px = track.pose.position.x;
+            double py = track.pose.position.y;
+            double pz = track.pose.position.z;
+            double distance = std::sqrt(px*px + py*py + pz*pz);
+
+            text.pose.position.x = px;
+            text.pose.position.y = py;
+            text.pose.position.z = pz + (track.scale.z / 2.0) + 1.0;
+            text.scale.z = 0.8;
+            text.color.r = 1.0; text.color.g = 1.0; text.color.b = 1.0; text.color.a = 1.0;
+
+            std::string upper_label = final_label;
+            std::transform(upper_label.begin(), upper_label.end(), upper_label.begin(), ::toupper);
+            char buffer[100];
+            snprintf(buffer, sizeof(buffer), "ID: %d\n%s\n%.1fm", real_id, upper_label.c_str(), distance);
+            text.text = buffer;
+
+             // Generate Cross-DELETE Markers (To prevent Ghosts)
+            visualization_msgs::msg::Marker cube_del;
+            cube_del.header = track.header;
+            cube_del.ns = "semantic_cubes";
+            cube_del.id = real_id;
+            cube_del.action = visualization_msgs::msg::Marker::DELETE;
+
+            visualization_msgs::msg::Marker text_del;
+            text_del.header = track.header;
+            text_del.ns = "semantic_labels";
+            text_del.id = real_id + 10000;
+            text_del.action = visualization_msgs::msg::Marker::DELETE;
+
+            // Route Logic
+            std::string lower_label = final_label;
+            std::transform(lower_label.begin(), lower_label.end(), lower_label.begin(), ::tolower);
+            
+            if (lower_label == "unknown") {
+                unknown_array.markers.push_back(cube);
+                unknown_array.markers.push_back(text);
+                identified_array.markers.push_back(cube_del);
+                identified_array.markers.push_back(text_del);
+            } else {
+                identified_array.markers.push_back(cube);
+                identified_array.markers.push_back(text);
+                unknown_array.markers.push_back(cube_del);
+                unknown_array.markers.push_back(text_del);
+            }
+        }
+
+        if (!identified_array.markers.empty()) {
+            pub_identified_->publish(identified_array);
+        }
+
+        if (!unknown_array.markers.empty())  {
+            pub_unknown_->publish(unknown_array);
+        }
     }
+};
+
+int main(int argc, char * argv[])
+{
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<LidarCameraFusionNode>());
+    rclcpp::shutdown();
+    return 0;
+}
 
 
 
 
 
 
-
-
-}   

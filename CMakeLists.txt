@@ -85,12 +85,29 @@ ament_target_dependencies(lidar_camera_projection_node
 )
 target_link_libraries(lidar_camera_projection_node ${OpenCV_LIBS})
 
+
+# 6. lidar_camera_fusion_node
+add_executable(lidar_camera_fusion_node src/lidar_camera_fusion_node.cpp)
+target_include_directories(lidar_camera_fusion_node PUBLIC
+  ${OpenCV_INCLUDE_DIRS}
+)
+ament_target_dependencies(lidar_camera_fusion_node
+  rclcpp
+  sensor_msgs
+  vision_msgs
+  visualization_msgs
+  std_msgs
+  cv_bridge
+)
+target_link_libraries(lidar_camera_fusion_node ${OpenCV_LIBRARIES})
+
 install(TARGETS 
   lidar_preprocessing_node 
   lidar_cluster_detector_node
   lidar_tracking_node
   image_overlay_node
   lidar_camera_projection_node
+  lidar_camera_fusion_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -101,4 +118,10 @@ install(PROGRAMS
   src/kitti_camera_publishing.py
   DESTINATION lib/${PROJECT_NAME}
 )
+
+# Install launch files
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}/
+)
+
 ament_package()

@@ -22,11 +22,17 @@ find_package(OpenCV REQUIRED)
 
 include_directories(
   include
+  include/clustering
   ${PCL_INCLUDE_DIRS}
 )
 
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
+
+# DBSCAN Library
+add_library(dbscan_lib src/dbscan.cpp)
+
+target_link_libraries(dbscan_lib ${PCL_LIBRARIES})
 
 
 if(BUILD_TESTING)
@@ -101,6 +107,19 @@ ament_target_dependencies(lidar_camera_fusion_node
 )
 target_link_libraries(lidar_camera_fusion_node ${OpenCV_LIBRARIES})
 
+# 7. lidar_cluster_detector_dbscan_node
+add_executable(lidar_cluster_detector_dbscan_node src/lidar_cluster_detector_dbscan_node.cpp)
+ament_target_dependencies(lidar_cluster_detector_dbscan_node
+  rclcpp
+  sensor_msgs
+  visualization_msgs
+  pcl_conversions
+)
+target_link_libraries(lidar_cluster_detector_dbscan_node 
+  ${PCL_LIBRARIES}
+  dbscan_lib)
+
+
 install(TARGETS 
   lidar_preprocessing_node 
   lidar_cluster_detector_node
@@ -108,14 +127,16 @@ install(TARGETS
   image_overlay_node
   lidar_camera_projection_node
   lidar_camera_fusion_node
+  lidar_cluster_detector_dbscan_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
 # Python
 install(PROGRAMS
-  src/kitti_lidar_publishing.py
+  src/kitti_lidar_publisher.py
   src/camera_object_detection_node.py
-  src/kitti_camera_publishing.py
+  src/kitti_camera_publisher.py
+  src/kitti_data_publisher.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

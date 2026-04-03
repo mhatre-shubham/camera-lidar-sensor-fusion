@@ -33,7 +33,7 @@ public:
         // Publisher
         image_pub_ = this->create_publisher<ImageMsg>("/fusion/lidar_camera_projection", 10);
 
-        RCLCPP_INFO(this->get_logger(), " Lidar-Camera Fusion Node Startedd");
+        RCLCPP_INFO(this->get_logger(), " Lidar-Camera Projection Node Started");
     }
 
 private:
@@ -101,7 +101,7 @@ private:
         sensor_msgs::PointCloud2ConstIterator<float> iter_y(*cloud_msg, "y");
         sensor_msgs::PointCloud2ConstIterator<float> iter_z(*cloud_msg, "z");
 
-        int count = 0;
+        // int count = 0;
 
         for (; iter_x != iter_x.end(); ++iter_x, ++iter_y, ++iter_z)
         {

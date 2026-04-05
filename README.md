@@ -7,36 +7,36 @@ The project is built using ROS2, which provides a modular and scalable framework
 ## Pipeline Overview
 The system is built using ROS2 and is structured as modular ROS2 nodes, where each node performs a specific task in the perception pipeline.
 
-### 1. KITTI Data Publisher (kitti_data_publisher)
+#### 1. KITTI Data Publisher (`kitti_data_publisher`)
 - Utilized the KITTI dataset to publish synchronized 3D LiDAR and camera data.
 
-### 2. LiDAR Preprocessing Node (lidar_preprocessing_node)
+#### 2. LiDAR Preprocessing (`lidar_preprocessing_node`)
 - Subscribes to raw LiDAR point cloud data.
 - Performs Voxel downsampling, ROI filtering for performance.
 - Performs ground plane segmentation using RANSAC to separate ground points from objects points.
 
-### 3. LiDAR 3D Clustering (lidar_cluster_detector_dbscan_node)
+#### 3. LiDAR 3D Clustering (`lidar_cluster_detector_dbscan_node`)
 - Subscribes to non-ground LiDAR point clouds.
 - Performs clustering using DBSCAN.
 - Applies geometric filtering to extrac objects and remove small objects or noise.
 - Publishes clustered objects ( 3D axis-aligned bonding boxes).
 
-### 4. Object Tracking (lidar_tracking_node)
+#### 4. Object Tracking (`lidar_tracking_node`)
 - Subscribes to clustered LiDAR objects.
 - Tracks objects across frames and maintains object identities using a Kalman Filter.
 - Utilizes Greedy Nearest-Neighbor for data association.
 
-### 5. Camera Object Detection (camera_object_detection_node)
+#### 5. Camera Object Detection (`camera_object_detection_node`)
 - Uses deep learning (YOLOv11) to detect objects in camera images.
 - Filters relevant classes from the COCO dataset.
 - Outputs 2D bounding boxes (vision_msgs).
 
-### 6. Image Overlay (image_overlay_node)
+#### 6. Image Overlay (`image_overlay_node`)
 - Subscribes to camera images and 3D tracked object data.
 - Uses calibration matrices to project LiDAR points onto the camera image plane.
 - Publishes annotated images with object ID, class and distance for visualization and debugging.
 
-### 7. Sensor Fusion (lidar_camera_fusion_node)
+#### 7. Sensor Fusion (`lidar_camera_fusion_node`)
 - Fuses the lidar and camera sensor data.
 - Associates LiDAR and camera detections using projection.
 - Matches YOLO object semantic class to persistent 3D Kalman Filter tracks.

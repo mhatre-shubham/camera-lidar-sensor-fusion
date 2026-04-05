@@ -68,3 +68,42 @@ cd ~/ros2_humble
 colcon build --packages-select camera_lidar_perception
 source install/setup.bash
 ```
+
+## Running the Perception Stack
+
+The entire perception pipeline can be run either by launching the provided launch file or by running individual ROS2 nodes.
+
+### 1. Using the Launch File
+To start the full pipeline at once:
+```bash
+ros2 launch camera_lidar_perception sensor_fusion_launch.py
+```
+
+### 2. Running Indiviudal Nodes
+```bash
+
+# Kitti data publisher
+ros2 run camera_lidar_perception kitti_data_publisher
+
+# Lidar preprocessing
+ros2 run camera_lidar_perception lidar_preprocessing_node
+
+# Lidar cluster detection (DBSCAN)
+ros2 run camera_lidar_perception lidar_cluster_detector_dbscan_node
+
+# Lidar tracking
+ros2 run camera_lidar_perception lidar_tracking_node
+
+# Camera object detection
+ros2 run camera_lidar_perception camera_object_detection_node
+
+# Image overlay
+ros2 run camera_lidar_perception image_overlay_node
+
+# Sensor Fusion
+ros2 run camera_lidar_perception lidar_camera_fusion_node
+```
+
+## Visualization
+
+Use RViz2 or Foxglove for visualization.

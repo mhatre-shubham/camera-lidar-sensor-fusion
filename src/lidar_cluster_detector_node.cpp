@@ -25,7 +25,7 @@ public:
         bbox_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
             "/lidar/bounding_boxes", 10);
         
-        RCLCPP_INFO(this->get_logger(), "Lidar Cluster Detectot Node Started...");
+        RCLCPP_INFO(this->get_logger(), "Lidar Cluster Detector Node Started...");
     
     }
 
@@ -70,7 +70,7 @@ private:
         // Process each cluster
         for (const auto& indices : cluster_indices)
         {
-            if (indices.indices.size() < 30)
+            if (indices.indices.size() < 20)
                 continue;
 
             pcl::PointCloud<pcl::PointXYZ>::Ptr cluster(new pcl::PointCloud<pcl::PointXYZ>());

@@ -47,8 +47,8 @@ private:
         // ROI Filtering
         pcl::CropBox<pcl::PointXYZ> crop;
         crop.setInputCloud(cloud_filtered);
-        crop.setMin(Eigen::Vector4f(-20.0, -10.0, -3.0, 1.0)); // (backward, right)
-        crop.setMax(Eigen::Vector4f(50.0, 10.0, 5.0, 1.0)); // (forward, left)
+        crop.setMin(Eigen::Vector4f(-30.0, -10.0, -3.0, 1.0)); // (backward, right)
+        crop.setMax(Eigen::Vector4f(70.0, 10.0, 5.0, 1.0)); // (forward, left)
 
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_roi(new pcl::PointCloud<pcl::PointXYZ>());
         crop.filter(*cloud_roi);

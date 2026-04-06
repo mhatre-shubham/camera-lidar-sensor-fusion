@@ -90,13 +90,13 @@ private:
         color.a = 0.7;
 
         if (label == "car" || label == "truck" || label == "bus" || label == "bicycle" || label == "motorcycle") {
-            color.r = 1.0; color.g = 0.5; color.b = 0.0; // Orange
-        } else if (label == "person") {
-            color.r = 1.0; color.g = 0.0; color.b = 0.0; // Red
-        } else if (label == "traffic light" || label == "stop sign") {
-            color.r = 1.0; color.g = 1.0; color.b = 0.0; // Yellow
-        } else if (label == "unknown") {
             color.r = 0.0; color.g = 1.0; color.b = 0.0; // Green
+        } else if (label == "person") {
+            color.r = 1.0; color.g = 0.5; color.b = 0.0; // Orange
+        } else if (label == "traffic light" || label == "stop sign") {
+            color.r = 1.0; color.g = 0.0; color.b = 0.0; // Red
+        } else if (label == "unknown") {
+            color.r = 1.0; color.g = 1.0; color.b = 0.0; // Yellow
         } else {
             color.r = 0.0; color.g = 1.0; color.b = 1.0; // Cyan
         }

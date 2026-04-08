@@ -1,6 +1,8 @@
 #include <rclcpp/rclcpp.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 #include <visualization_msgs/msg/marker.hpp>
+#include <vision_msgs/msg/detection3_d_array.hpp>
+#include <vision_msgs/msg/detection3_d.hpp>
 #include <Eigen/Dense>
 #include <vector>
 #include <cmath>
@@ -83,12 +85,14 @@ public:
         this->declare_parameter<double>("distance_threshold", 4.0);
         this->get_parameter("distance_threshold", distance_threshold_);
 
-        subscription_ = this->create_subscription<visualization_msgs::msg::MarkerArray>(
-            "/lidar/bounding_boxes",
+        subscription_ = this->create_subscription<vision_msgs::msg::Detection3DArray>(
+            "/lidar/clustered_detected_objects",
             10,
             std::bind(&ObjectTrackingNode::detection_callback, this, std::placeholders::_1));
 
-        tracked_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("/lidar/tracked_objects", 10);
+        tracked_pub_ = this->create_publisher<vision_msgs::msg::Detection3DArray>("/lidar/tracked_objects", 10);
+
+        marker_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>("/lidar/tracked_objects_markers", 10);
 
         RCLCPP_INFO(this->get_logger(), "Lidar Tracker Node Started...");
 }
@@ -102,12 +106,12 @@ private:
     int max_age_;
     double distance_threshold_;
 
-    void detection_callback(const visualization_msgs::msg::MarkerArray::SharedPtr msg){
-        if (msg->markers.empty())
+    void detection_callback(const vision_msgs::msg::Detection3DArray::SharedPtr msg){
+        if (msg->detections.empty())
             return;
 
         double current_time_float = 0.0;
-        std::string current_frame = "map";
+        std::string current_frame = "base_link";
         builtin_interfaces::msg::Time stamp;
         bool stamp_found = false;
 
@@ -115,17 +119,16 @@ private:
         std::vector<Eigen::Vector3d> detections;
         std::vector<std::vector<double>> dimensions;
 
-        for (const auto& marker : msg->markers){
-            if (marker.action == visualization_msgs::msg::Marker::ADD){
-                if (!stamp_found){
-                    stamp = marker.header.stamp;
-                    current_frame = marker.header.frame_id;
-                    current_time_float = stamp.sec + (stamp.nanosec * 1e-9);
-                    stamp_found = true;
-                }
-                detections.push_back(Eigen::Vector3d(marker.pose.position.x, marker.pose.position.y, marker.pose.position.z));
-                dimensions.push_back({marker.scale.x, marker.scale.y, marker.scale.z});
+        for (const auto& det : msg->detections){
+            if (!stamp_found){
+                stamp = det.header.stamp;
+                current_frame = det.header.frame_id;
+                current_time_float = stamp.sec + (stamp.nanosec * 1e-9);
+                stamp_found = true;
             }
+            detections.push_back(Eigen::Vector3d(det.bbox.center.position.x, det.bbox.center.position.y, det.bbox.center.position.z));
+            dimensions.push_back({det.bbox.size.x, det.bbox.size.y, det.bbox.size.z});
+
         }
 
         if (!stamp_found)
@@ -226,6 +229,7 @@ private:
             [this](const Track& t) { return t.time_since_update > max_age_; }), tracks_.end());
 
         publish_markers(current_frame, stamp);
+        publish_detection3d(current_frame, stamp);
     }
     
     void publish_markers(const std::string& frame_id, const builtin_interfaces::msg::Time& stamp) {
@@ -272,11 +276,37 @@ private:
             marker_array.markers.push_back(text_marker);
         }
 
-        tracked_pub_->publish(marker_array);
+        marker_pub_->publish(marker_array);
+    }
+    
+    void publish_detection3d(const std::string& frame_id, const builtin_interfaces::msg::Time& stamp){
+        vision_msgs::msg::Detection3DArray det_array;
+        det_array.header.frame_id = frame_id;
+        det_array.header.stamp = stamp;
+
+        for (const auto& track : tracks_){
+            if (track.hits < 3) continue;
+
+            vision_msgs::msg::Detection3D det;
+            det.bbox.center.position.x = track.x(0);
+            det.bbox.center.position.y = track.x(1);
+            det.bbox.center.position.z = track.x(2);
+            det.bbox.center.orientation.w = 1.0;
+            det.bbox.size.x = track.size[0];
+            det.bbox.size.y = track.size[1];
+            det.bbox.size.z = track.size[2];
+            det.id = std::to_string(track.track_id);
+
+            det_array.detections.push_back(det);
+        }
+
+        tracked_pub_->publish(det_array);
     }
 
-    rclcpp::Subscription<visualization_msgs::msg::MarkerArray>::SharedPtr subscription_;
-    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr tracked_pub_;
+    rclcpp::Subscription<vision_msgs::msg::Detection3DArray>::SharedPtr subscription_;
+    rclcpp::Publisher<vision_msgs::msg::Detection3DArray>::SharedPtr tracked_pub_;
+    rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr marker_pub_;
+
 };
 
 

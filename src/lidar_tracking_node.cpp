@@ -121,8 +121,8 @@ private:
 
         for (const auto& det : msg->detections){
             if (!stamp_found){
-                stamp = det.header.stamp;
-                current_frame = det.header.frame_id;
+                stamp = msg->header.stamp;
+                current_frame = msg->header.frame_id;
                 current_time_float = stamp.sec + (stamp.nanosec * 1e-9);
                 stamp_found = true;
             }

@@ -11,9 +11,7 @@
 class LidarCameraProjectionNode : public rclcpp::Node
 {
 public:
-    using ImageMsg = sensor_msgs::msg::Image;
-    using CloudMsg = sensor_msgs::msg::PointCloud2;
-    using SyncPolicy = message_filters::sync_policies::ApproximateTime<ImageMsg, CloudMsg>;
+    using SyncPolicy = message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image, sensor_msgs::msg::PointCloud2>;
 
     LidarCameraProjectionNode() : Node("lidar_camera_projection_node")
     {
@@ -31,19 +29,19 @@ public:
                       std::placeholders::_1, std::placeholders::_2));
 
         // Publisher
-        image_pub_ = this->create_publisher<ImageMsg>("/fusion/lidar_camera_projection", 10);
+        image_pub_ = this->create_publisher<sensor_msgs::msg::Image>("/fusion/lidar_camera_projection", 10);
 
         RCLCPP_INFO(this->get_logger(), " Lidar-Camera Projection Node Started");
     }
 
 private:
     // Subscribers
-    message_filters::Subscriber<ImageMsg> image_sub_;
-    message_filters::Subscriber<CloudMsg> cloud_sub_;
+    message_filters::Subscriber<sensor_msgs::msg::Image> image_sub_;
+    message_filters::Subscriber<sensor_msgs::msg::PointCloud2> cloud_sub_;
     std::shared_ptr<message_filters::Synchronizer<SyncPolicy>> sync_;
 
     // Publisher
-    rclcpp::Publisher<ImageMsg>::SharedPtr image_pub_;
+    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr image_pub_;
 
     // Projection matrix
     cv::Mat projection_matrix_;
@@ -82,8 +80,8 @@ private:
         );
     }
 
-    void fusion_callback(const ImageMsg::ConstSharedPtr img_msg,
-                         const CloudMsg::ConstSharedPtr cloud_msg)
+    void fusion_callback(const sensor_msgs::msg::Image::ConstSharedPtr img_msg,
+                         const sensor_msgs::msg::PointCloud2::ConstSharedPtr cloud_msg)
     {
         // Convert ROS → OpenCV
         cv_bridge::CvImagePtr cv_ptr;

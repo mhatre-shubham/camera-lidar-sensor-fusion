@@ -3,6 +3,8 @@
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 #include <vision_msgs/msg/detection2_d_array.hpp>
+#include <vision_msgs/msg/detection3_d_array.hpp>
+#include <vision_msgs/msg/detection3_d.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/opencv.hpp>
 #include <vector>
@@ -27,7 +29,7 @@ public:
             std::bind(&ImageOverlayNode::yolo_callback, this, std::placeholders::_1)
         );
         
-        mot_sub_ = this->create_subscription<visualization_msgs::msg::MarkerArray>(
+        mot_sub_ = this->create_subscription<vision_msgs::msg::Detection3DArray>(
             "/lidar/tracked_objects",
             10,
             std::bind(&ImageOverlayNode::mot_callback, this, std::placeholders::_1)
@@ -50,10 +52,10 @@ private:
     cv::Mat projection_matrix_;
 
     vision_msgs::msg::Detection2DArray latest_yolo_detections_;
-    std::vector<visualization_msgs::msg::Marker> latest_tracks_;
+    std::vector<vision_msgs::msg::Detection3D> latest_tracks_;
 
     rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr yolo_sub_;
-    rclcpp::Subscription<visualization_msgs::msg::MarkerArray>::SharedPtr mot_sub_;
+    rclcpp::Subscription<vision_msgs::msg::Detection3DArray>::SharedPtr mot_sub_;
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr image_sub_;
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr image_pub_;
 
@@ -85,12 +87,10 @@ private:
         latest_yolo_detections_ = *msg;
     }
 
-    void mot_callback(const visualization_msgs::msg::MarkerArray::SharedPtr msg) {
+    void mot_callback(const vision_msgs::msg::Detection3DArray::SharedPtr msg) {
         latest_tracks_.clear();
-        for (const auto& marker : msg->markers) {
-            if (marker.type == visualization_msgs::msg::Marker::CUBE && marker.action == visualization_msgs::msg::Marker::ADD) {
-                latest_tracks_.push_back(marker);
-            }
+        for (const auto& det : msg->detections) {
+            latest_tracks_.push_back(det);
         }
     }
 
@@ -138,18 +138,18 @@ private:
 
         // Sort MOT tracks by distance (furthest to closest for proper drawing occlusion)
         std::sort(latest_tracks_.begin(), latest_tracks_.end(),
-        [](const visualization_msgs::msg::Marker& a, const visualization_msgs::msg::Marker& b) {
-            return a.pose.position.x > b.pose.position.x;
+        [](const vision_msgs::msg::Detection3D& a, const vision_msgs::msg::Detection3D& b) {
+            return a.bbox.center.position.x > b.bbox.center.position.x;
         });
 
-        std::vector<visualization_msgs::msg::Marker> valid_tracks;
+        std::vector<vision_msgs::msg::Detection3D> valid_tracks;
         std::vector<cv::Rect2f> valid_mot_boxes;
         std::vector<double> distances;
 
         // Parse and Project Valid MOT Tracks
         for (const auto& track : latest_tracks_) {
-            auto pos = track.pose.position;
-            auto dim = track.scale;
+            auto pos = track.bbox.center.position;
+            auto dim = track.bbox.size;
             double dist = std::sqrt(pos.x*pos.x + pos.y*pos.y + pos.z*pos.z);
 
             std::vector<cv::Point2f> corners;
@@ -237,10 +237,11 @@ private:
 
             cv::rectangle(img, draw_box, color, thickness);
             char label_text[100];
+            int track_id = std::stoi(valid_tracks[i].id);
             std::transform(best_label.begin(), best_label.end(), best_label.begin(), ::toupper);
             snprintf(label_text, sizeof(label_text), "%s | ID:%d | %.1fm",
                     best_label.c_str(), 
-                    valid_tracks[i].id / 2, 
+                    track_id, 
                     distances[i]);
 
             int baseline = 0;

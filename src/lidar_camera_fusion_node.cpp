@@ -2,6 +2,9 @@
 #include <visualization_msgs/msg/marker.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 #include <vision_msgs/msg/detection2_d_array.hpp>
+#include <vision_msgs/msg/detection3_d_array.hpp>
+#include <vision_msgs/msg/detection3_d.hpp>
+#include <vision_msgs/msg/object_hypothesis_with_pose.hpp>
 #include <std_msgs/msg/color_rgba.hpp>
 #include <opencv2/opencv.hpp>
 #include <vector>
@@ -24,7 +27,7 @@ public:
         yolo_sub_ = this->create_subscription<vision_msgs::msg::Detection2DArray>(
             "/camera/object_detections", 10, std::bind(&LidarCameraFusionNode::yolo_callback, this, std::placeholders::_1));
 
-        mot_sub_ = this->create_subscription<visualization_msgs::msg::MarkerArray>(
+        mot_sub_ = this->create_subscription<vision_msgs::msg::Detection3DArray>(
             "/lidar/tracked_objects", 10, std::bind(&LidarCameraFusionNode::mot_callback, this, std::placeholders::_1));
             
         pub_identified_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
@@ -32,7 +35,13 @@ public:
 
         pub_unknown_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
             "/fusion/unknown_objects", 10);
-    
+            
+        pub_identified_vision_ = this->create_publisher<vision_msgs::msg::Detection3DArray>(
+            "/fusion/identified_objects_vision", 10);
+
+        pub_unknown_vision_ = this->create_publisher<vision_msgs::msg::Detection3DArray>(
+            "/fusion/unknown_objects_vision", 10);
+
         RCLCPP_INFO(this->get_logger(), "Lidar Camera Fusion Node Started...");
     }
 
@@ -42,12 +51,15 @@ private:
     vision_msgs::msg::Detection2DArray latest_yolo_detections_;
 
     std::map<int, std::string> label_memory_;
+    std::map<int, double> score_memory_;
     std::set<int> active_ids_;
 
     rclcpp::Subscription<vision_msgs::msg::Detection2DArray>::SharedPtr yolo_sub_;
-    rclcpp::Subscription<visualization_msgs::msg::MarkerArray>::SharedPtr mot_sub_;
+    rclcpp::Subscription<vision_msgs::msg::Detection3DArray>::SharedPtr mot_sub_;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_identified_;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_unknown_;
+    rclcpp::Publisher<vision_msgs::msg::Detection3DArray>::SharedPtr pub_identified_vision_;
+    rclcpp::Publisher<vision_msgs::msg::Detection3DArray>::SharedPtr pub_unknown_vision_;
 
     void setup_calibration_matrices()
     {
@@ -107,61 +119,63 @@ private:
     latest_yolo_detections_ = *msg;
     }
 
-    void mot_callback(const visualization_msgs::msg::MarkerArray::SharedPtr msg) {
+    void mot_callback(const vision_msgs::msg::Detection3DArray::SharedPtr msg) {
         visualization_msgs::msg::MarkerArray identified_array;
         visualization_msgs::msg::MarkerArray unknown_array;
+        vision_msgs::msg::Detection3DArray identified_detections;
+        vision_msgs::msg::Detection3DArray unknown_detections;
 
         // Extract YOLO
         std::vector<cv::Rect2f> yolo_boxes;
         std::vector<std::string> yolo_labels;
+        std::vector<double> yolo_scores;
         for (const auto& det : latest_yolo_detections_.detections) {
             float x = det.bbox.center.position.x - det.bbox.size_x / 2.0;
             float y = det.bbox.center.position.y - det.bbox.size_y / 2.0;
             yolo_boxes.push_back(cv::Rect2f(x, y, det.bbox.size_x, det.bbox.size_y));
             yolo_labels.push_back(det.results[0].hypothesis.class_id);
+            yolo_scores.push_back(det.results[0].hypothesis.score);
         }
 
         std::set<int> current_live_ids;
-        std::vector<visualization_msgs::msg::Marker> live_tracks;
+        std::vector<vision_msgs::msg::Detection3D> live_tracks;
         std::vector<cv::Rect2f> valid_mot_boxes;
         std::vector<int> valid_mot_indices;
 
         std_msgs::msg::Header ref_header;
-        if (!msg->markers.empty()) ref_header = msg->markers[0].header;
+        if (!msg->detections.empty()) ref_header = msg->header;
 
         // Parse Live Tracks
-        for (const auto& m : msg->markers) {
-            if (m.action == visualization_msgs::msg::Marker::ADD && m.type == visualization_msgs::msg::Marker::CUBE) {
-                int real_id = m.id / 2;
-                current_live_ids.insert(real_id);
-                live_tracks.push_back(m);
+        for (const auto& m : msg->detections) {
+            int real_id = std::stoi(m.id);
+            current_live_ids.insert(real_id);
+            live_tracks.push_back(m);
 
-                auto pos = m.pose.position;
-                auto dim = m.scale;
-                std::vector<cv::Point2f> corners;
+            auto pos = m.bbox.center.position;
+            auto dim = m.bbox.size;
+            std::vector<cv::Point2f> corners;
 
-                // Cube Corners
-                double dx_vals[] = {-dim.x/2, dim.x/2};
-                double dy_vals[] = {-dim.y/2, dim.y/2};
-                double dz_vals[] = {-dim.z/2, dim.z/2};
+            // Cube Corners
+            double dx_vals[] = {-dim.x/2, dim.x/2};
+            double dy_vals[] = {-dim.y/2, dim.y/2};
+            double dz_vals[] = {-dim.z/2, dim.z/2};
 
-                for (double dx : dx_vals) {
-                    for (double dy : dy_vals) {
-                        for (double dz : dz_vals) {
-                            cv::Point2f p = project_3d(pos.x + dx, pos.y + dy, pos.z + dz);
-                            if (p.x != -1)  corners.push_back(p);
-                        } 
-                    }
+            for (double dx : dx_vals) {
+                for (double dy : dy_vals) {
+                    for (double dz : dz_vals) {
+                        cv::Point2f p = project_3d(pos.x + dx, pos.y + dy, pos.z + dz);
+                        if (p.x != -1)  corners.push_back(p);
+                    } 
                 }
+            }
 
-                if (corners.size() >= 4 ) {
-                    valid_mot_boxes.push_back(cv::boundingRect(corners));
-                    valid_mot_indices.push_back(live_tracks.size() - 1);
-                }
+            if (corners.size() >= 4 ) {
+                valid_mot_boxes.push_back(cv::boundingRect(corners));
+                valid_mot_indices.push_back(live_tracks.size() - 1);
             }
         }
 
-        // Deletion Logic (Cleanup stale memory). Erase memory when track is eliminated
+        // Deletion Logic. Erase memory when track is eliminated
         std::vector<int> dead_ids;
         std::set_difference(active_ids_.begin(), active_ids_.end(),
                             current_live_ids.begin(), current_live_ids.end(),
@@ -187,6 +201,7 @@ private:
             unknown_array.markers.push_back(text_delete);
 
             label_memory_.erase(dead_id);
+            score_memory_.erase(dead_id);
         }
 
         active_ids_ = current_live_ids;
@@ -226,12 +241,16 @@ private:
         }
         
         // Generate Fused Markers using label memory
+        identified_detections.header = msg->header;
+        unknown_detections.header = msg->header;
+
         for (size_t i = 0; i < live_tracks.size(); ++i) {
             auto& track = live_tracks[i];
-            int real_id = track.id / 2;
+            int real_id = std::stoi(track.id);
             
             if (matched_live_track_indices.count(i)) {
                 label_memory_[real_id] = yolo_labels[matched_live_track_indices[i]];
+                score_memory_[real_id] = yolo_scores[matched_live_track_indices[i]];
             }
 
             std::string final_label;
@@ -240,28 +259,59 @@ private:
             } else {
                 final_label = "Unknown";
             }
+            
+            // Fused vision msg
+            vision_msgs::msg::Detection3D fused_det;
+            fused_det.header = msg->header;
+            fused_det.bbox.center.position.x = track.bbox.center.position.x;
+            fused_det.bbox.center.position.y = track.bbox.center.position.y;
+            fused_det.bbox.center.position.z = track.bbox.center.position.z;
+            fused_det.bbox.center.orientation.w = 1.0;
+            fused_det.bbox.size.x = track.bbox.size.x;
+            fused_det.bbox.size.y = track.bbox.size.y;
+            fused_det.bbox.size.z = track.bbox.size.z;
+
+            fused_det.id = real_id;
+            
+            // Fused object Class
+            vision_msgs::msg::ObjectHypothesisWithPose hyp;
+            hyp.hypothesis.class_id = final_label;
+            if (score_memory_.count(real_id)) {
+                hyp.hypothesis.score = score_memory_[real_id];
+            }
+            fused_det.results.clear();
+            fused_det.results.push_back(hyp);
 
             // Generate ADD Markers
-            visualization_msgs::msg::Marker cube = track;
+            visualization_msgs::msg::Marker cube;
+            cube.header = msg->header;
             cube.ns = "semantic_cubes";
             cube.id = real_id;
+            cube.type = visualization_msgs::msg::Marker::CUBE;
+            cube.action = visualization_msgs::msg::Marker::ADD;
+            cube.pose.position.x = track.bbox.center.position.x;
+            cube.pose.position.y = track.bbox.center.position.y;
+            cube.pose.position.z = track.bbox.center.position.z;
+            cube.scale.x = track.bbox.size.x;
+            cube.scale.y = track.bbox.size.y;
+            cube.scale.z = track.bbox.size.z;
             cube.color = get_semantic_color(final_label);
 
             visualization_msgs::msg::Marker text;
-            text.header = track.header;
+            text.header = msg->header;
             text.ns = "semantic_labels";
             text.id = real_id + 10000;
             text.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
             text.action = visualization_msgs::msg::Marker::ADD;
 
-            double px = track.pose.position.x;
-            double py = track.pose.position.y;
-            double pz = track.pose.position.z;
+            double px = track.bbox.center.position.x;
+            double py = track.bbox.center.position.y;
+            double pz = track.bbox.center.position.z;
             double distance = std::sqrt(px*px + py*py + pz*pz);
 
             text.pose.position.x = px;
             text.pose.position.y = py;
-            text.pose.position.z = pz + (track.scale.z / 2.0) + 1.0;
+            text.pose.position.z = pz + (track.bbox.size.z / 2.0) + 1.0;
             text.scale.z = 0.8;
             text.color.r = 1.0; text.color.g = 1.0; text.color.b = 1.0; text.color.a = 1.0;
 
@@ -273,13 +323,13 @@ private:
 
              // Generate Cross-DELETE Markers (To prevent Ghosts)
             visualization_msgs::msg::Marker cube_del;
-            cube_del.header = track.header;
+            cube_del.header = msg->header;
             cube_del.ns = "semantic_cubes";
             cube_del.id = real_id;
             cube_del.action = visualization_msgs::msg::Marker::DELETE;
 
             visualization_msgs::msg::Marker text_del;
-            text_del.header = track.header;
+            text_del.header = msg->header;
             text_del.ns = "semantic_labels";
             text_del.id = real_id + 10000;
             text_del.action = visualization_msgs::msg::Marker::DELETE;
@@ -293,11 +343,13 @@ private:
                 unknown_array.markers.push_back(text);
                 identified_array.markers.push_back(cube_del);
                 identified_array.markers.push_back(text_del);
+                unknown_detections.detections.push_back(fused_det);
             } else {
                 identified_array.markers.push_back(cube);
                 identified_array.markers.push_back(text);
                 unknown_array.markers.push_back(cube_del);
                 unknown_array.markers.push_back(text_del);
+                identified_detections.detections.push_back(fused_det);
             }
         }
 
@@ -307,6 +359,14 @@ private:
 
         if (!unknown_array.markers.empty())  {
             pub_unknown_->publish(unknown_array);
+        }
+
+        // Publish vision_msgs
+        if (!identified_detections.detections.empty()){
+            pub_identified_vision_->publish(identified_detections);
+        }
+        if (!unknown_detections.detections.empty()){
+            pub_unknown_vision_->publish(unknown_detections);
         }
     }
 };

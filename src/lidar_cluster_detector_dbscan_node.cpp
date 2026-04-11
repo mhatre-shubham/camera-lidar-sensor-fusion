@@ -1,6 +1,8 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
+#include <vision_msgs/msg/detection3_d_array.hpp>
+#include <vision_msgs/msg/detection3_d.hpp>
 
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_types.h>
@@ -25,6 +27,9 @@ public:
 
         bbox_pub_ = this->create_publisher<visualization_msgs::msg::MarkerArray>(
             "/lidar/bounding_boxes", 10);
+
+        detection_pub_ = this->create_publisher<vision_msgs::msg::Detection3DArray>(
+            "/lidar/clustered_detected_objects", 10);
         
         RCLCPP_INFO(this->get_logger(), "Lidar Cluster Detector Node Started...");
     
@@ -60,6 +65,10 @@ private:
         visualization_msgs::msg::Marker delete_marker;
         delete_marker.action = visualization_msgs::msg::Marker::DELETEALL;
         marker_array.markers.push_back(delete_marker);
+
+        // Detection3DArray
+        vision_msgs::msg::Detection3DArray detections_array;
+        detections_array.header = msg->header;
 
         int obstacle_id = 0;
 
@@ -122,10 +131,28 @@ private:
             marker.color.a = 0.3;
 
             marker_array.markers.push_back(marker);
-    
+
+            // Detction3D
+            vision_msgs::msg::Detection3D detection;
+            detection.header = msg->header;
+            detection.bbox.center.position.x = (min_pt.x + max_pt.x) / 2.0;
+            detection.bbox.center.position.y = (min_pt.y + max_pt.y) / 2.0;
+            detection.bbox.center.position.z = (min_pt.z + max_pt.z) / 2.0;
+
+            detection.bbox.size.x = size_x;
+            detection.bbox.size.y = size_y;
+            detection.bbox.size.z = size_z;
+
+            detection.bbox.center.orientation.x = 0.0;
+            detection.bbox.center.orientation.y = 0.0;
+            detection.bbox.center.orientation.z = 0.0;
+            detection.bbox.center.orientation.w = 1.0;
+            detections_array.detections.push_back(detection);
         }
 
         bbox_pub_->publish(marker_array);
+        detection_pub_->publish(detections_array);
+
         if (!valid_obstacles->empty())
         {
             sensor_msgs::msg::PointCloud2 output_msg;
@@ -138,6 +165,7 @@ private:
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr obstacles_pub_;
     rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr bbox_pub_;
+    rclcpp::Publisher<vision_msgs::msg::Detection3DArray>::SharedPtr detection_pub_;
 };
 
 

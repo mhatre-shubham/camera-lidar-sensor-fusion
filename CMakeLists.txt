@@ -58,6 +58,7 @@ ament_target_dependencies(lidar_cluster_detector_node
   rclcpp
   sensor_msgs
   visualization_msgs
+  vision_msgs
   pcl_conversions
 )
 target_link_libraries(lidar_cluster_detector_node ${PCL_LIBRARIES})
@@ -67,6 +68,7 @@ add_executable(lidar_tracking_node src/lidar_tracking_node.cpp)
 ament_target_dependencies(lidar_tracking_node
   rclcpp
   visualization_msgs
+  vision_msgs
 )
 target_link_libraries(lidar_tracking_node Eigen3::Eigen)
 
@@ -114,6 +116,7 @@ ament_target_dependencies(lidar_cluster_detector_dbscan_node
   sensor_msgs
   visualization_msgs
   pcl_conversions
+  vision_msgs
 )
 target_link_libraries(lidar_cluster_detector_dbscan_node 
   ${PCL_LIBRARIES}

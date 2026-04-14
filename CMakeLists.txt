@@ -136,9 +136,7 @@ install(TARGETS
 
 # Python
 install(PROGRAMS
-  src/kitti_lidar_publisher.py
   src/camera_object_detection_node.py
-  src/kitti_camera_publisher.py
   src/kitti_data_publisher.py
   DESTINATION lib/${PROJECT_NAME}
 )

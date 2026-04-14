@@ -23,7 +23,7 @@ class KittiSyncPublisher(Node):
     def __init__(self):
         super().__init__('kitti_sync_publisher')
 
-        self.base_path = "/home/mhatre/ros2_humble/data/2011_09_26_drive_0011_sync/2011_09_26/2011_09_26_drive_0011_sync"
+        self.base_path = "/home/mhatre/ros2_humble/data/2011_09_26_drive_0005_sync/2011_09_26/2011_09_26_drive_0005_sync"
 
         self.lidar_path = os.path.join(self.base_path, "velodyne_points/data")
         self.image_path = os.path.join(self.base_path, "image_02/data")
@@ -138,12 +138,13 @@ class KittiSyncPublisher(Node):
 
         header = Header()
         header.stamp = Time(sec=sec, nanosec=nanosec)
-        header.frame_id = "base_link"
+        header.frame_id = "velodyne"
 
         cloud = pc2.create_cloud_xyz32(header, points[:, :3])
 
         ros_img = self.bridge.cv2_to_imgmsg(img, encoding="bgr8")
-        ros_img.header = header
+        ros_img.header.stamp = header.stamp
+        ros_img.header.frame_id = "camera_left"
 
         self.lidar_pub.publish(cloud)
         self.image_pub.publish(ros_img)

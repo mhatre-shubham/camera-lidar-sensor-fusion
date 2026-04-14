@@ -250,7 +250,7 @@ private:
             box_marker.header.frame_id = frame_id;
             box_marker.header.stamp = stamp;
             box_marker.ns = "tracked_boxes";
-            box_marker.id = track.track_id * 2;
+            box_marker.id = track.track_id;
             box_marker.type = visualization_msgs::msg::Marker::CUBE;
             box_marker.action = visualization_msgs::msg::Marker::ADD;
             box_marker.pose.position.x = x; box_marker.pose.position.y = y; box_marker.pose.position.z = z;
@@ -262,7 +262,7 @@ private:
             visualization_msgs::msg::Marker text_marker;
             text_marker.header = box_marker.header;
             text_marker.ns = "tracked_text";
-            text_marker.id = (track.track_id * 2) + 1;
+            text_marker.id = track.track_id;
             text_marker.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
             text_marker.pose.position.x = x; text_marker.pose.position.y = y; 
             text_marker.pose.position.z = z + (track.size[2] / 2.0) + 0.5;

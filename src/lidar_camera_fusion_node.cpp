@@ -191,7 +191,7 @@ private:
             visualization_msgs::msg::Marker text_delete;
             text_delete.header = ref_header;
             text_delete.ns = "semantic_labels";
-            text_delete.id = dead_id + 10000; // To avoid conflicts with cube IDs
+            text_delete.id = dead_id;
             text_delete.action = visualization_msgs::msg::Marker::DELETE;
 
             identified_array.markers.push_back(cube_delete);
@@ -300,7 +300,7 @@ private:
             visualization_msgs::msg::Marker text;
             text.header = msg->header;
             text.ns = "semantic_labels";
-            text.id = real_id + 10000;
+            text.id = real_id;
             text.type = visualization_msgs::msg::Marker::TEXT_VIEW_FACING;
             text.action = visualization_msgs::msg::Marker::ADD;
 
@@ -331,7 +331,7 @@ private:
             visualization_msgs::msg::Marker text_del;
             text_del.header = msg->header;
             text_del.ns = "semantic_labels";
-            text_del.id = real_id + 10000;
+            text_del.id = real_id;
             text_del.action = visualization_msgs::msg::Marker::DELETE;
 
             // Route Logic

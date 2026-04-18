@@ -1,8 +1,17 @@
 # LiDAR Camera Sensor Fusion
 
-This repository contains a multi-sensor fusion pipeline that combines camera data and LiDAR point cloud data for robust perception in autonomous driving. The system performs 3D object detection, object classification and object tracking using the KITTI Dataset.
+This repository contains a multi-sensor fusion pipeline that combines camera data and LiDAR point cloud data for robust perception in autonomous driving. The system performs 3D object detection, object classification and multi-object tracking using the KITTI Dataset.
 
-The project is built using ROS2, which provides a modular and scalable framework for developing and integrating different components of the perception pipeline. For camera based object detection, the system utilizes YOLO, while LiDAR data is processed using point cloud techniques to extract spatial and geometric information about the environment.
+The project is built using ROS2, which provides a modular and scalable framework for developing and integrating different components of the perception pipeline. For camera based object detection, the system utilizes YOLO, while LiDAR data is processed using point cloud techniques to extract spatial and geometric information about the environment. The system uses a late fusion approach to combine camera and LiDAR outputs.
+
+### Sensor Fusion Visualization
+<img src="results/sensor_fusion.png" width="100%">
+
+### Camera-Based Object Detection
+![Camera Detection](results/camera_detection.jpg)
+
+### LiDAR Projection on Camera Image
+![LiDAR Projection](results/lidar_projection.jpg)
 
 ## Pipeline Overview
 The system is built using ROS2 and is structured as modular ROS2 nodes, where each node performs a specific task in the perception pipeline.

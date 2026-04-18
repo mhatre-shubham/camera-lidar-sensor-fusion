@@ -19,7 +19,7 @@ public:
 
         // Subscribers
         image_sub_.subscribe(this, "/kitti/image/color/left");
-        cloud_sub_.subscribe(this, "/lidar/clustered_obstacles_pcd");
+        cloud_sub_.subscribe(this, "/kitti/point_cloud");
 
         sync_ = std::make_shared<message_filters::Synchronizer<SyncPolicy>>(
             SyncPolicy(10), image_sub_, cloud_sub_);
@@ -117,9 +117,28 @@ private:
                 continue;
 
             double dist = std::sqrt(x*x + y*y + z*z);
-            int intensity = std::min(255, int(255.0 * dist / 50.0));
+            double norm = std::min(dist / 50.0, 1.0);
 
-            cv::circle(img, pt, 2, cv::Scalar(0, intensity, 255 - intensity), -1);
+            double r = 0, g = 0, b = 0;
+
+            if (norm < 0.5)
+            {
+                double t = norm / 0.5;
+                r = (1.0 - t) * 255;
+                g = t * 255;
+                b = 0;
+            }
+            else
+            {
+                double t = (norm - 0.5) / 0.5;
+                r = 0;
+                g = (1.0 - t) * 255;
+                b = t * 255;
+            }
+
+            cv::Scalar color(b, g, r);
+
+            cv::circle(img, pt, 2, color, -1);
         }
 
         // Publish result
